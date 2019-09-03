@@ -23,33 +23,28 @@ var (
 		Password: "", // no password set
 		DB:       2,  // use default DB
 	})
-	status = redis.NewClient(&redis.Options{
+	topics = redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set
 		DB:       3,  // use default DB
 	})
-	actions = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       4,  // use default DB
-	})
 	db = db_start()
 )
-
-
 
 //////// STATUS CHECKERS ////////
 func db_start() *sql.DB {
 	db, err := sql.Open("mysql", "web:1Q2w3e4r@tcp(127.0.0.1:3306)/rmote")
-	if err != nil {log.Println("Error connecting to mysql server")}
+	if err != nil {
+		log.Println("Error connecting to mysql server")
+	}
 	err = db.Ping()
-	if err != nil {log.Println("Error pinging mysql server")}
+	if err != nil {
+		log.Println("Error pinging mysql server")
+	}
 	return db
 }
 
 /////////////////////////////////
-
-
 
 func get_pw(user *string) string {
 	var safe = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
@@ -58,13 +53,9 @@ func get_pw(user *string) string {
 		if err == nil {
 			return get
 		} else {
-			results, err := db.Query(string("SELECT pw FROM user WHERE username='" + *user + "' limit 1"))
+			results, err := db.Query(string("SELECT pw FROM user WHERE username=?"), *user)
 			if err != nil {
-				db_start()
-				results, err = db.Query(string("SELECT pw FROM user WHERE username='" + *user + "' limit 1"))
-				if err != nil {
-					return ""
-				}
+				return ""
 			}
 			type Tag struct {
 				pw string `json:"pw"`
@@ -87,9 +78,6 @@ func get_pw(user *string) string {
 	return ""
 }
 
-
-
-
 func in_acls(user *string, topic *string) bool {
 	var safe = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
 	var topic_safe = regexp.MustCompile(`^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$`).MatchString
@@ -99,17 +87,14 @@ func in_acls(user *string, topic *string) bool {
 		if err != nil {
 			return false
 		} else if sina(topic, &get) == false {
-			results, err := db.Query(string("SELECT mac FROM acls WHERE username='" + *user + "'"))
+			results, err := db.Query(string("(SELECT mac FROM acls WHERE user=(SELECT id FROM user WHERE username=%s)) UNION (SELECT acls.mac FROM acls, share WHERE share.user=(SELECT id FROM user WHERE username=%s) AND share.mac=acls.mac)"), *user, *user)
 			if err != nil {
-				db_start()
-				results, err = db.Query(string("SELECT mac FROM acls WHERE username='" + *user + "'"))
-				if err != nil {
-					return false
-				}
+				return false
 			}
 			type Tag struct {
 				mac string `json:"mac"`
 			}
+			get = nil
 			for results.Next() {
 				var tag Tag
 				err = results.Scan(&tag.mac)
@@ -119,8 +104,10 @@ func in_acls(user *string, topic *string) bool {
 				get = append(get, tag.mac)
 			}
 			if len(get) > 0 {
-				err := acls.SAdd(*user,get).Err()
-				if err != nil {return false}
+				err := acls.SAdd(*user, get).Err()
+				if err != nil {
+					return false
+				}
 			}
 		}
 		return sina(topic, &get)
@@ -128,9 +115,7 @@ func in_acls(user *string, topic *string) bool {
 	return false
 }
 
-
-
-func check_pw (hs *string, pw *string) bool{
+func check_pw(hs *string, pw *string) bool {
 	hash := sha256.New()
 	if _, err := io.Copy(hash, strings.NewReader(*pw)); err != nil {
 		return false
