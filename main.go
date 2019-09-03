@@ -32,8 +32,8 @@ func SocketServer(port int) {
 		log.Fatal(err)
 	}
 	cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
-	listen, err := tls.Listen("tcp4", ":"+strconv.Itoa(port),cfg)
-	defer func(){
+	listen, err := tls.Listen("tcp4", ":"+strconv.Itoa(port), cfg)
+	defer func() {
 		log.Println("Reloading tcp server...")
 		err = listen.Close()
 		if err != nil {
@@ -45,7 +45,7 @@ func SocketServer(port int) {
 		log.Fatalf("Socket listen port %d failed,%s", port, err)
 		time.Sleep(time.Second)
 	}
-	log.Printf("Listening on %s",listen.Addr())
+	log.Printf("Listening on %s", listen.Addr())
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
@@ -54,7 +54,7 @@ func SocketServer(port int) {
 		} else {
 			go handler(conn)
 		}
-		time.Sleep(time.Millisecond*50)
+		time.Sleep(time.Millisecond * 50)
 	}
 
 }
@@ -62,15 +62,16 @@ func SocketServer(port int) {
 func handler(conn net.Conn) {
 	defer conn.Close()
 	var (
-		buf = make([]byte, 1024)
-		r   = bufio.NewReader(conn)
-		w   = bufio.NewWriter(conn)
-		timeout = time.Duration(10)
-		last_will = ""
+		buf         = make([]byte, 1024)
+		r           = bufio.NewReader(conn)
+		w           = bufio.NewWriter(conn)
+		timeout     = time.Duration(100)
+		last_will   = ""
+		last_will_s int64
 		last_will_p = ""
-		username = ""
+		username    = ""
 	)
-	conn.SetDeadline(time.Now().Add(timeout*time.Second))
+	conn.SetDeadline(time.Now().Add(timeout * time.Second))
 	username = ""
 LOOP:
 	for {
@@ -81,14 +82,14 @@ LOOP:
 		case io.EOF:
 			break LOOP
 		case nil:
-			if strings.HasSuffix(data, "\n")  {
-				if len(data)>310{
+			if strings.HasSuffix(data, "\n") {
+				if len(data) > 310 {
 					break LOOP
 				}
-				if handle(&data, &conn, &timeout, &last_will, &last_will_p, &username) == false{
+				if handle(&data, &conn, &timeout, &last_will, &last_will_s, &last_will_p, &username) == false {
 					break LOOP
 				}
-				conn.SetDeadline(time.Now().Add(timeout*time.Second))
+				conn.SetDeadline(time.Now().Add(timeout * time.Second))
 			}
 		default:
 			break LOOP
@@ -96,7 +97,7 @@ LOOP:
 
 	}
 	if last_will != "" {
-		err := status.Set(last_will, last_will_p, 0).Err()
+		err := topics.HSet(last_will, string(last_will_s), last_will_p).Err()
 		if err != nil {
 			log.Println("Error communicating with redis")
 			panic(err)
@@ -106,11 +107,9 @@ LOOP:
 	log.Printf("Client from %s disconnected", conn.RemoteAddr())
 }
 
-
 func main() {
 	v.TCP()
 	for {
 		SocketServer(2443)
 	}
 }
-

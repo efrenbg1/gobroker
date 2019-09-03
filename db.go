@@ -8,7 +8,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"io"
 	"log"
-	"regexp"
 	"strings"
 )
 
@@ -33,7 +32,7 @@ var (
 
 //////// STATUS CHECKERS ////////
 func db_start() *sql.DB {
-	db, err := sql.Open("mysql", "web:1Q2w3e4r@tcp(127.0.0.1:3306)/rmote")
+	db, err := sql.Open("mysql", "web:SuperPowers4All@tcp(127.0.0.1:3306)/rmote")
 	if err != nil {
 		log.Println("Error connecting to mysql server")
 	}
@@ -47,41 +46,35 @@ func db_start() *sql.DB {
 /////////////////////////////////
 
 func get_pw(user *string) string {
-	var safe = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
-	if safe(*user) == true {
-		get, err := users.Get(*user).Result()
-		if err == nil {
-			return get
-		} else {
-			results, err := db.Query(string("SELECT pw FROM user WHERE username=?"), *user)
+	get, err := users.Get(*user).Result()
+	if err == nil {
+		return get
+	} else {
+		results, err := db.Query(string("SELECT pw FROM user WHERE username=?"), *user)
+		if err != nil {
+			return ""
+		}
+		type Tag struct {
+			pw string `json:"pw"`
+		}
+		for results.Next() {
+			var tag Tag
+			err = results.Scan(&tag.pw)
 			if err != nil {
 				return ""
 			}
-			type Tag struct {
-				pw string `json:"pw"`
+			err = users.Set(*user, tag.pw, 0).Err()
+			if err != nil {
+				return ""
 			}
-			for results.Next() {
-				var tag Tag
-				err = results.Scan(&tag.pw)
-				if err != nil {
-					return ""
-				}
-				err = users.Set(*user, tag.pw, 0).Err()
-				if err != nil {
-					return ""
-				}
-				return tag.pw
-			}
-			return ""
+			return tag.pw
 		}
 	}
 	return ""
 }
 
 func in_acls(user *string, topic *string) bool {
-	var safe = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
-	var topic_safe = regexp.MustCompile(`^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$`).MatchString
-	if safe(*user) == true && topic_safe(*topic) == true {
+	if len(*topic) < 100 && len(*user) < 100 {
 		var get []string
 		get, err := acls.SMembers(*user).Result() //action checker in sina function
 		if err != nil {
