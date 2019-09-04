@@ -34,7 +34,7 @@ func sina(a *string, list *[]string) bool { //checks if string is in array
 	return false
 }
 
-func handle(data *string, conn *net.Conn, timeout *time.Duration, last_will *string, last_will_s *int64, last_will_p *string, username *string) bool {
+func handle(data *string, conn *net.Conn, timeout *time.Duration, last_will *string, last_will_s *string, last_will_p *string, username *string) bool {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Println("Handle failed:", err)

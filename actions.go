@@ -103,25 +103,30 @@ func retrieve(data *string, username *string) (bool, string) {
 }
 
 ////////// LAST-WILL //////////
-func lastpublish(data *string, last_will *string, last_will_s *int64, last_will_p *string, username *string) (bool, string) {
+func lastpublish(data *string, last_will *string, last_will_s *string, last_will_p *string, username *string) (bool, string) {
 	if *username != "" {
-		var topic_end, err = strconv.Atoi((*data)[4:6])
-		if err != nil {
+		topic_end, err := strconv.Atoi((*data)[4:6])
+		if errH(err) {
 			return false, ""
 		}
 		topic_end = topic_end + 6
 		var topic = (*data)[6:topic_end]
 		slot, err := strconv.ParseInt((*data)[topic_end:topic_end+1], 10, 64)
+		if errH(err) {
+			return false, ""
+		}
 		if in_acls(username, &topic) {
 			payload_end, err := strconv.Atoi((*data)[topic_end+1 : topic_end+3])
-			if err != nil {
+			if errH(err) {
 				return false, ""
 			}
 			payload_end = topic_end + payload_end + 3
-			payload := (*data)[topic_end+2 : payload_end]
+			payload := (*data)[topic_end+3 : payload_end]
 			*last_will = topic
-			*last_will_s = slot
+			*last_will_s = string(slot)
 			*last_will_p = payload
+
+			log.Println(*last_will_p)
 			return true, "MQS3\n"
 		}
 		return false, "MQS8\n"

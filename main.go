@@ -65,9 +65,9 @@ func handler(conn net.Conn) {
 		buf         = make([]byte, 1024)
 		r           = bufio.NewReader(conn)
 		w           = bufio.NewWriter(conn)
-		timeout     = time.Duration(100)
+		timeout     = time.Duration(10)
 		last_will   = ""
-		last_will_s int64
+		last_will_s = ""
 		last_will_p = ""
 		username    = ""
 	)
@@ -97,7 +97,10 @@ LOOP:
 
 	}
 	if last_will != "" {
-		err := topics.HSet(last_will, string(last_will_s), last_will_p).Err()
+		log.Println(last_will)
+		log.Println(last_will_s)
+		log.Println(last_will_p)
+		err := topics.HSet(last_will, last_will_s, last_will_p).Err()
 		if err != nil {
 			log.Println("Error communicating with redis")
 			panic(err)
