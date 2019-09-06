@@ -70,7 +70,7 @@ func publish(data *string, username *string) (bool, string) {
 			}
 			payload_end = topic_end + payload_end + 3
 			payload := (*data)[topic_end+3 : payload_end]
-			err = topics.HSet(topic, string(slot), payload).Err()
+			err = topics.HSet(topic, strconv.FormatInt(slot, 10), payload).Err()
 			if errH(err) {
 				return false, ""
 			}
@@ -84,15 +84,19 @@ func publish(data *string, username *string) (bool, string) {
 func retrieve(data *string, username *string) (bool, string) {
 	if *username != "" {
 		topic_end, err := strconv.Atoi((*data)[4:6])
-		if err != nil {
+		if errH(err) {
 			return false, ""
 		}
 		topic_end = topic_end + 6
 		var topic = (*data)[6:topic_end]
 		slot, err := strconv.ParseInt((*data)[topic_end:topic_end+1], 10, 64)
+		if errH(err) {
+			return false, ""
+		}
 		if in_acls(username, &topic) {
-			payload, err := topics.HGet(topic, string(slot)).Result()
-			if err != nil {
+			payload, err := topics.HGet(topic, strconv.FormatInt(slot, 10)).Result()
+			log.Println(payload)
+			if errH(err) {
 				return true, "MQS7\n"
 			}
 			return true, string("MQS2" + getlen(&payload) + payload + "\n")
