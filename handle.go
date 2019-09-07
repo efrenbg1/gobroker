@@ -4,7 +4,6 @@ import (
 	"log"
 	"net"
 	"strconv"
-	"time"
 )
 
 func errH(e error) bool {
@@ -34,7 +33,7 @@ func sina(a *string, list *[]string) bool { //checks if string is in array
 	return false
 }
 
-func handle(data *string, conn *net.Conn, timeout *time.Duration, last_will *string, last_will_s *string, last_will_p *string, username *string) bool {
+func handle(data *string, conn *net.Conn, last_will *string, last_will_s *string, last_will_p *string, username *string) bool {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Println("Handle failed:", err)
@@ -43,7 +42,7 @@ func handle(data *string, conn *net.Conn, timeout *time.Duration, last_will *str
 	if "MQS" == (*data)[0:3] {
 		var act = (*data)[3]
 		if act == '0' {
-			done, resp := login(data, conn, timeout, username)
+			done, resp := login(data, conn, username)
 			if resp != "" {
 				_, err := (*conn).Write([]byte(resp))
 				if err != nil {

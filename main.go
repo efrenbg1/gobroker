@@ -1,7 +1,7 @@
 package main
 
 import (
-	v "./linux"
+	v "./windows"
 	"bufio"
 	"crypto/tls"
 	"io"
@@ -65,13 +65,12 @@ func handler(conn net.Conn) {
 		buf         = make([]byte, 1024)
 		r           = bufio.NewReader(conn)
 		w           = bufio.NewWriter(conn)
-		timeout     = time.Duration(10)
 		last_will   = ""
 		last_will_s = ""
 		last_will_p = ""
 		username    = ""
 	)
-	conn.SetDeadline(time.Now().Add(timeout * time.Second))
+	conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
 	username = ""
 LOOP:
 	for {
@@ -86,10 +85,10 @@ LOOP:
 				if len(data) > 310 {
 					break LOOP
 				}
-				if handle(&data, &conn, &timeout, &last_will, &last_will_s, &last_will_p, &username) == false {
+				if handle(&data, &conn, &last_will, &last_will_s, &last_will_p, &username) == false {
 					break LOOP
 				}
-				conn.SetDeadline(time.Now().Add(timeout * time.Second))
+				conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
 			}
 		default:
 			break LOOP
@@ -97,9 +96,6 @@ LOOP:
 
 	}
 	if last_will != "" {
-		log.Println(last_will)
-		log.Println(last_will_s)
-		log.Println(last_will_p)
 		err := topics.HSet(last_will, last_will_s, last_will_p).Err()
 		if err != nil {
 			log.Println("Error communicating with redis")

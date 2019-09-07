@@ -4,11 +4,10 @@ import (
 	"log"
 	"net"
 	"strconv"
-	"time"
 )
 
 ////////// LOGIN //////////
-func login(data *string, conn *net.Conn, timeout *time.Duration, username *string) (bool, string) {
+func login(data *string, conn *net.Conn, username *string) (bool, string) {
 	user_end, err := strconv.Atoi((*data)[4:6])
 	if errH(err) {
 		return false, ""
@@ -27,18 +26,6 @@ func login(data *string, conn *net.Conn, timeout *time.Duration, username *strin
 		pw_end = pw_end + user_end + 2
 		pw := (*data)[user_end+2 : pw_end]
 		if check_pw(&get, &pw) == true {
-			timer, err := strconv.Atoi((*data)[pw_end : len(*data)-1])
-			if errH(err) {
-				return false, "MQS9\n"
-			}
-			if timer > 99 {
-				return false, ""
-			}
-			*timeout = time.Duration(timer)
-			err = (*conn).SetDeadline(time.Now().Add(*timeout * time.Second))
-			if errH(err) {
-				return false, ""
-			}
 			*username = user
 			log.Println("New connection from " + (*conn).RemoteAddr().String() + " of " + user)
 			return true, "MQS0\n"
@@ -95,7 +82,6 @@ func retrieve(data *string, username *string) (bool, string) {
 		}
 		if in_acls(username, &topic) {
 			payload, err := topics.HGet(topic, strconv.FormatInt(slot, 10)).Result()
-			log.Println(payload)
 			if errH(err) {
 				return true, "MQS7\n"
 			}
