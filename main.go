@@ -1,7 +1,7 @@
 package main
 
 import (
-	v "./windows"
+	v "./linux"
 	"bufio"
 	"crypto/tls"
 	"io"

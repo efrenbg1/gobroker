@@ -127,10 +127,8 @@ func lastpublish(data *string, last_will *string, last_will_s *string, last_will
 			payload_end = topic_end + payload_end + 3
 			payload := (*data)[topic_end+3 : payload_end]
 			*last_will = topic
-			*last_will_s = string(slot)
+			*last_will_s = strconv.FormatInt(slot, 10)
 			*last_will_p = payload
-
-			log.Println(*last_will_p)
 			return true, "MQS3\n"
 		}
 		return false, "MQS8\n"
