@@ -32,7 +32,7 @@ var (
 
 //////// STATUS CHECKERS ////////
 func db_start() *sql.DB {
-	db, err := sql.Open("mysql", "web:SuperPowers4All@tcp(127.0.0.1:3306)/rmote")
+	db, err := sql.Open("mysql", "web:@tcp(basa.10x.es:3306)/rmote")
 	if err != nil {
 		log.Println("Error connecting to mysql server")
 	}
@@ -110,11 +110,11 @@ func in_acls(user *string, topic *string) bool {
 
 func check_pw(hs *string, pw *string) bool {
 	hash := sha256.New()
-	if _, err := io.Copy(hash, strings.NewReader(*pw)); err != nil {
+	if _, err := io.Copy(hash, strings.NewReader((*hs)[64:]+*pw)); err != nil {
 		return false
 	}
 	sum := hash.Sum(nil)
-	if *hs == hex.EncodeToString(sum) {
+	if (*hs)[:64] == hex.EncodeToString(sum) {
 		return true
 	} else {
 		return false
