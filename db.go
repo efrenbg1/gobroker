@@ -32,7 +32,7 @@ var (
 
 //////// STATUS CHECKERS ////////
 func db_start() *sql.DB {
-	db, err := sql.Open("mysql", "web:@tcp(basa.10x.es:3306)/rmote")
+	db, err := sql.Open("mysql", "web:SuperPowers4All@tcp(127.0.0.1:3306)/rmote")
 	if err != nil {
 		log.Println("Error connecting to mysql server")
 	}
