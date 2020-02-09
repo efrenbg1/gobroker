@@ -80,7 +80,7 @@ func in_acls(user *string, topic *string) bool {
 		if err != nil {
 			return false
 		} else if sina(topic, &get) == false {
-			results, err := db.Query(string("(SELECT mac FROM acls WHERE user=(SELECT id FROM user WHERE username=%s)) UNION (SELECT acls.mac FROM acls, share WHERE share.user=(SELECT id FROM user WHERE username=%s) AND share.mac=acls.mac)"), *user, *user)
+			results, err := db.Query(string("(SELECT mac FROM acls WHERE user=(SELECT id FROM user WHERE username=?)) UNION (SELECT acls.mac FROM acls, share WHERE share.user=(SELECT id FROM user WHERE username=?) AND share.mac=acls.mac)"), *user, *user)
 			if err != nil {
 				return false
 			}
