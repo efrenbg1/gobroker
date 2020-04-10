@@ -4,35 +4,67 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"github.com/go-redis/redis"
-	_ "github.com/go-sql-driver/mysql"
 	"io"
 	"log"
 	"strings"
+	"sync"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var (
-	users = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       1,  // use default DB
-	})
-	acls = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       2,  // use default DB
-	})
-	topics = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       3,  // use default DB
-	})
-	db = db_start()
+	users   = make(map[string]string)
+	lusers  sync.RWMutex
+	acls    = make(map[string][]string)
+	lacls   sync.RWMutex
+	topics  = make(map[string][10]string)
+	ltopics sync.RWMutex
+	db      = dbStart()
 )
 
-//////// STATUS CHECKERS ////////
-func db_start() *sql.DB {
-	db, err := sql.Open("mysql", "web:SuperPowers4All@tcp(127.0.0.1:3306)/rmote")
+func getUser(key *string) string {
+	lusers.RLock()
+	defer lusers.RUnlock()
+	return users[*key]
+
+}
+
+func setUser(key *string, value *string) {
+	lusers.Lock()
+	defer lusers.Unlock()
+	users[*key] = *value
+
+}
+
+func getAcls(key *string) []string {
+	lacls.RLock()
+	defer lacls.RUnlock()
+	return acls[*key]
+}
+
+func setAcls(key *string, value *[]string) {
+	lacls.Lock()
+	defer lacls.Unlock()
+	acls[*key] = *value
+}
+
+func getTopic(key *string, slot *int) string {
+	ltopics.RLock()
+	defer ltopics.RUnlock()
+	return topics[*key][*slot]
+}
+
+func setTopic(key *string, slot *int, value *string) {
+	ltopics.Lock()
+	defer ltopics.Unlock()
+	data := topics[*key]
+	data[*slot] = *value
+	topics[*key] = data
+}
+
+func dbStart() *sql.DB {
+	//db, err := sql.Open("mysql", "web:SuperPowers4All@tcp(127.0.0.1:3306)/rmote")
+	db, err := sql.Open("mysql", "web:Edilizia5!@tcp(192.168.0.4:3306)/rmote")
 	if err != nil {
 		log.Println("Error connecting to mysql server")
 	}
@@ -43,72 +75,44 @@ func db_start() *sql.DB {
 	return db
 }
 
-/////////////////////////////////
-
-func get_pw(user *string) string {
-	get, err := users.Get(*user).Result()
-	if err == nil {
-		return get
-	} else {
-		results, err := db.Query(string("SELECT pw FROM user WHERE username=?"), *user)
-		if err != nil {
-			return ""
-		}
-		type Tag struct {
-			pw string `json:"pw"`
-		}
-		for results.Next() {
-			var tag Tag
-			err = results.Scan(&tag.pw)
-			if err != nil {
-				return ""
-			}
-			err = users.Set(*user, tag.pw, 0).Err()
-			if err != nil {
-				return ""
-			}
-			return tag.pw
-		}
+func getPw(user *string) string {
+	pw := getUser(user)
+	if pw != "" {
+		return pw
 	}
-	return ""
+	err := db.QueryRow("SELECT pw FROM user WHERE username=? LIMIT 1", *user).Scan(&pw)
+	if err != nil {
+		return ""
+	}
+	setUser(user, &pw)
+	return pw
 }
 
-func in_acls(user *string, topic *string) bool {
-	if len(*topic) < 100 && len(*user) < 100 {
-		var get []string
-		get, err := acls.SMembers(*user).Result() //action checker in sina function
+func inAcls(user *string, topic *string) bool {
+	macs := getAcls(user)
+	if sina(topic, &macs) {
+		return true
+	}
+	macs = nil
+	q, err := db.Query("SELECT a.mac FROM acls AS a LEFT JOIN share AS s ON a.mac=s.mac WHERE a.user=(SELECT id FROM user WHERE username=?) OR s.user=(SELECT id FROM user WHERE username=?)", *user, *user)
+	if err != nil {
+		return false
+	}
+	var mac string
+	for q.Next() {
+		err = q.Scan(&mac)
 		if err != nil {
 			return false
-		} else if sina(topic, &get) == false {
-			results, err := db.Query(string("(SELECT mac FROM acls WHERE user=(SELECT id FROM user WHERE username=?)) UNION (SELECT acls.mac FROM acls, share WHERE share.user=(SELECT id FROM user WHERE username=?) AND share.mac=acls.mac)"), *user, *user)
-			if err != nil {
-				return false
-			}
-			type Tag struct {
-				mac string `json:"mac"`
-			}
-			get = nil
-			for results.Next() {
-				var tag Tag
-				err = results.Scan(&tag.mac)
-				if err != nil {
-					return false
-				}
-				get = append(get, tag.mac)
-			}
-			if len(get) > 0 {
-				err := acls.SAdd(*user, get).Err()
-				if err != nil {
-					return false
-				}
-			}
 		}
-		return sina(topic, &get)
+		macs = append(macs, mac)
 	}
-	return false
+	if len(macs) > 0 {
+		setAcls(user, &macs)
+	}
+	return sina(topic, &macs)
 }
 
-func check_pw(hs *string, pw *string) bool {
+func checkPw(hs *string, pw *string) bool {
 	hash := sha256.New()
 	if _, err := io.Copy(hash, strings.NewReader((*hs)[64:]+*pw)); err != nil {
 		return false
@@ -116,7 +120,6 @@ func check_pw(hs *string, pw *string) bool {
 	sum := hash.Sum(nil)
 	if (*hs)[:64] == hex.EncodeToString(sum) {
 		return true
-	} else {
-		return false
 	}
+	return false
 }

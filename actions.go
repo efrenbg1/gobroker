@@ -4,34 +4,34 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"sync"
 )
 
 ////////// LOGIN //////////
 func login(data *string, conn *net.Conn, username *string) (bool, string) {
-	user_end, err := strconv.Atoi((*data)[4:6])
+	userEnd, err := strconv.Atoi((*data)[4:6])
 	if errH(err) {
 		return false, ""
 	}
-	user_end = user_end + 6
-	var user = (*data)[6:user_end]
-	get := get_pw(&user)
+	userEnd = userEnd + 6
+	var user = (*data)[6:userEnd]
+	get := getPw(&user)
 	if errH(err) {
 		return false, "MQS9\n"
 	}
 	if get != "" {
-		pw_end, err := strconv.Atoi((*data)[user_end : user_end+2])
+		pwEnd, err := strconv.Atoi((*data)[userEnd : userEnd+2])
 		if errH(err) {
 			return false, ""
 		}
-		pw_end = pw_end + user_end + 2
-		pw := (*data)[user_end+2 : pw_end]
-		if check_pw(&get, &pw) == true {
+		pwEnd = pwEnd + userEnd + 2
+		pw := (*data)[userEnd+2 : pwEnd]
+		if checkPw(&get, &pw) == true {
 			*username = user
 			log.Println("New connection from " + (*conn).RemoteAddr().String() + " of " + user)
 			return true, "MQS0\n"
-		} else {
-			return false, "MQS9\n"
 		}
+		return false, "MQS9\n"
 	}
 	return false, ""
 
@@ -40,27 +40,24 @@ func login(data *string, conn *net.Conn, username *string) (bool, string) {
 ////////// PUBLISH //////////
 func publish(data *string, username *string) (bool, string) {
 	if *username != "" {
-		topic_end, err := strconv.Atoi((*data)[4:6])
+		topicEnd, err := strconv.Atoi((*data)[4:6])
 		if errH(err) {
 			return false, ""
 		}
-		topic_end = topic_end + 6
-		var topic = (*data)[6:topic_end]
-		slot, err := strconv.ParseInt((*data)[topic_end:topic_end+1], 10, 64)
-		if errH(err) {
+		topicEnd = topicEnd + 6
+		var topic = (*data)[6:topicEnd]
+		slot, err := strconv.Atoi((*data)[topicEnd : topicEnd+1])
+		if errH(err) || slot > 9 || slot < 0 {
 			return false, ""
 		}
-		if in_acls(username, &topic) {
-			payload_end, err := strconv.Atoi((*data)[topic_end+1 : topic_end+3])
+		if inAcls(username, &topic) {
+			payloadEnd, err := strconv.Atoi((*data)[topicEnd+1 : topicEnd+3])
 			if errH(err) {
-				return false, ""
+
 			}
-			payload_end = topic_end + payload_end + 3
-			payload := (*data)[topic_end+3 : payload_end]
-			err = topics.HSet(topic, strconv.FormatInt(slot, 10), payload).Err()
-			if errH(err) {
-				return false, ""
-			}
+			payloadEnd = topicEnd + payloadEnd + 3
+			payload := (*data)[topicEnd+3 : payloadEnd]
+			setTopic(&topic, &slot, &payload)
 			return true, ""
 		}
 	}
@@ -70,19 +67,19 @@ func publish(data *string, username *string) (bool, string) {
 ////////// RETRIEVE //////////
 func retrieve(data *string, username *string) (bool, string) {
 	if *username != "" {
-		topic_end, err := strconv.Atoi((*data)[4:6])
+		topicEnd, err := strconv.Atoi((*data)[4:6])
 		if errH(err) {
 			return false, ""
 		}
-		topic_end = topic_end + 6
-		var topic = (*data)[6:topic_end]
-		slot, err := strconv.ParseInt((*data)[topic_end:topic_end+1], 10, 64)
-		if errH(err) {
+		topicEnd = topicEnd + 6
+		var topic = (*data)[6:topicEnd]
+		slot, err := strconv.Atoi((*data)[topicEnd : topicEnd+1])
+		if errH(err) || slot > 9 || slot < 0 {
 			return false, ""
 		}
-		if in_acls(username, &topic) {
-			payload, err := topics.HGet(topic, strconv.FormatInt(slot, 10)).Result()
-			if errH(err) {
+		if inAcls(username, &topic) {
+			payload := getTopic(&topic, &slot)
+			if payload == "" {
 				return true, "MQS7\n"
 			}
 			return true, string("MQS2" + getlen(&payload) + payload + "\n")
@@ -93,29 +90,52 @@ func retrieve(data *string, username *string) (bool, string) {
 }
 
 ////////// LAST-WILL //////////
-func lastpublish(data *string, last_will *string, last_will_s *string, last_will_p *string, username *string) (bool, string) {
+func lastpublish(data *string, lastWill *string, lastWillS *int, lastWillP *string, username *string) (bool, string) {
 	if *username != "" {
-		topic_end, err := strconv.Atoi((*data)[4:6])
+		topicEnd, err := strconv.Atoi((*data)[4:6])
 		if errH(err) {
 			return false, ""
 		}
-		topic_end = topic_end + 6
-		var topic = (*data)[6:topic_end]
-		slot, err := strconv.ParseInt((*data)[topic_end:topic_end+1], 10, 64)
-		if errH(err) {
+		topicEnd = topicEnd + 6
+		var topic = (*data)[6:topicEnd]
+		slot, err := strconv.Atoi((*data)[topicEnd : topicEnd+1])
+		if errH(err) || slot > 9 || slot < 0 {
 			return false, ""
 		}
-		if in_acls(username, &topic) {
-			payload_end, err := strconv.Atoi((*data)[topic_end+1 : topic_end+3])
+		if inAcls(username, &topic) {
+			payloadEnd, err := strconv.Atoi((*data)[topicEnd+1 : topicEnd+3])
 			if errH(err) {
 				return false, ""
 			}
-			payload_end = topic_end + payload_end + 3
-			payload := (*data)[topic_end+3 : payload_end]
-			*last_will = topic
-			*last_will_s = strconv.FormatInt(slot, 10)
-			*last_will_p = payload
+			payloadEnd = topicEnd + payloadEnd + 3
+			payload := (*data)[topicEnd+3 : payloadEnd]
+			*lastWill = topic
+			*lastWillS = slot
+			*lastWillP = payload
 			return true, "MQS3\n"
+		}
+		return false, "MQS8\n"
+	}
+	return false, ""
+}
+
+////////// SUBSCRIBE //////////
+func watch(data *string, lconn *sync.RWMutex, conn *net.Conn, username *string, subscribe *string) (bool, string) {
+	if *username != "" {
+		topicEnd, err := strconv.Atoi((*data)[4:6])
+		if errH(err) {
+			return false, ""
+		}
+		topicEnd = topicEnd + 6
+		var topic = (*data)[6:topicEnd]
+		if inAcls(username, &topic) {
+			lconns.RLock()
+			defer lconns.RUnlock()
+			*subscribe = topic
+			routines := conns[topic]
+			routines = append(routines, routine{conn: conn, lconn: lconn})
+			conns[topic] = routines
+			return true, "MQS4"
 		}
 		return false, "MQS8\n"
 	}

@@ -1,36 +1,50 @@
 package main
 
 import (
-	v "./windows"
 	"bufio"
 	"crypto/tls"
 	"io"
 	"io/ioutil"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	v "./windows"
 )
 
-func SocketServer(port int) {
+type routine struct {
+	conn  *net.Conn
+	lconn *sync.RWMutex
+}
+
+var (
+	conns  = make(map[string][]routine)
+	lconns sync.RWMutex
+)
+
+func check(e error) {
+	if e != nil {
+		log.Println(e)
+		os.Exit(1)
+	}
+}
+
+func listen(port int) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Println("Fatal error:", err)
 		}
 	}()
-	certPem, err := ioutil.ReadFile("cert.pem")
-	if err != nil {
-		panic(err)
-	}
-	keyPem, err := ioutil.ReadFile("key.pem")
-	if err != nil {
-		panic(err)
-	}
+	certPem, err := ioutil.ReadFile("cert/cert.pem")
+	check(err)
+	keyPem, err := ioutil.ReadFile("cert/key.pem")
+	check(err)
 	cert, err := tls.X509KeyPair(certPem, keyPem)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
 	listen, err := tls.Listen("tcp4", ":"+strconv.Itoa(port), cfg)
 	defer func() {
@@ -56,22 +70,22 @@ func SocketServer(port int) {
 		}
 		time.Sleep(time.Millisecond * 50)
 	}
-
 }
 
 func handler(conn net.Conn) {
 	defer conn.Close()
 	var (
-		buf         = make([]byte, 1024)
-		r           = bufio.NewReader(conn)
-		w           = bufio.NewWriter(conn)
-		last_will   = ""
-		last_will_s = ""
-		last_will_p = ""
-		username    = ""
+		lconn     sync.RWMutex
+		buf       = make([]byte, 210)
+		r         = bufio.NewReader(conn)
+		w         = bufio.NewWriter(conn)
+		lwTopic   = ""
+		lwSlot    = 0
+		lwPayload = ""
+		username  = ""
+		subscribe = ""
 	)
 	conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
-	username = ""
 LOOP:
 	for {
 		n, err := r.Read(buf)
@@ -85,7 +99,7 @@ LOOP:
 				if len(data) > 310 {
 					break LOOP
 				}
-				if handle(&data, &conn, &last_will, &last_will_s, &last_will_p, &username) == false {
+				if handle(&data, &lconn, &conn, &lwTopic, &lwSlot, &lwPayload, &username, &subscribe) == false {
 					break LOOP
 				}
 				conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
@@ -95,20 +109,26 @@ LOOP:
 		}
 
 	}
-	if last_will != "" {
-		err := topics.HSet(last_will, last_will_s, last_will_p).Err()
-		if err != nil {
-			log.Println("Error communicating with redis")
-			panic(err)
+	if subscribe != "" {
+		lconns.RLock()
+		defer lconns.RUnlock()
+		routines := conns[subscribe]
+		for i, n := range conns[subscribe] {
+			if n.conn == &conn {
+				routines[i] = routines[len(routines)-1]
+				routines = routines[:len(routines)-1]
+				conns[subscribe] = routines
+				break
+			}
 		}
 	}
-	username = ""
+	if lwTopic != "" {
+		setTopic(&lwTopic, &lwSlot, &lwPayload)
+	}
 	log.Printf("Client from %s disconnected", conn.RemoteAddr())
 }
 
 func main() {
 	v.TCP()
-	for {
-		SocketServer(2443)
-	}
+	listen(2443)
 }
