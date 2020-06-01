@@ -5,14 +5,8 @@
     "tasks": [
         {
             "label": "Run",
-            "command": "go",
-            "args": [
-                "run",
-                "main.go",
-                "db.go",
-                "handle.go",
-                "actions.go"
-            ],
+            "command": "build.bat",
+            "args": [],
             "type": "shell",
             "options": {
                 "cwd": "${workspaceFolder}"

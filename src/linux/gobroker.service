@@ -1,0 +1,14 @@
+[Unit]
+Description=MQTLS Broker
+ConditionPathExists=/root/gobroker
+After=xdk-daemon.service
+
+[Service]
+WorkingDirectory=/root/gobroker
+ExecStart=/root/gobroker/gobroker
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
