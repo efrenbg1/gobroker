@@ -10,122 +10,118 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"strconv"
+	"os"
 	"strings"
 	"time"
 )
 
-func listen(port int) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Println("Fatal error:", err)
-		}
-	}()
-	certPem, err := ioutil.ReadFile("cert/cert.pem")
-	if Error(err) {
-		return 1
-	}
-	keyPem, err := ioutil.ReadFile("cert/key.pem")
-	check(err)
-	cert, err := tls.X509KeyPair(certPem, keyPem)
-	check(err)
-	cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
-	listen, err := tls.Listen("tcp4", ":"+strconv.Itoa(port), cfg)
-	defer func() {
-		log.Println("Reloading tcp server...")
-		err = listen.Close()
-		if err != nil {
-			log.Println(err)
-		}
-		recover()
-	}()
-	if err != nil {
-		log.Fatalf("Socket listen port %d failed,%s", port, err)
-		time.Sleep(time.Second)
-	}
-	log.Printf("Listening on %s", listen.Addr())
-	for {
-		conn, err := listen.Accept()
-		if err != nil {
-			log.Println(err)
-			continue
-		} else {
-			go handler(conn)
-		}
-		time.Sleep(time.Millisecond * 50)
-	}
-}
-
-func send(conn *net.Conn, resp string) {
-	if resp == "" {
-		return
-	}
-	_, _ = (*conn).Write([]byte(resp))
-}
-
 func handler(conn net.Conn) {
+	defer func() {
+		recover()
+		log.Printf("Client from %s disconnected", conn.RemoteAddr())
+	}()
 	defer conn.Close()
 	var (
-		buf     = make([]byte, 210)
-		r       = bufio.NewReader(conn)
-		w       = bufio.NewWriter(conn)
-		session = SessionData{&conn, "", "", 0, "", "", ""}
+		buf = make([]byte, 210)
+		r   = bufio.NewReader(conn)
+		w   = bufio.NewWriter(conn)
+		req = SessionData{&conn, "", "", 0, "", "", ""}
 	)
+	defer func() {
+		if req.Subscribe != "" {
+			WatchKill(&req)
+		}
+		if req.LwTopic != "" {
+			SetTopic(&req.LwTopic, &req.LwSlot, &req.LwPayload)
+		}
+	}()
 	conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
 LOOP:
 	for {
 		n, err := r.Read(buf)
-		data := string(buf[:n])
+		req.Data = string(buf[:n])
 		w.Flush()
-		if Error(err) {
+		if err != nil {
 			break LOOP
 		}
-		if strings.HasSuffix(data, "\n") {
+		if strings.HasSuffix(req.Data, "\n") {
 			conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
-			if len(data) > 310 {
+			if len(req.Data) > 310 {
 				break LOOP
 			}
-			if "MQS" == (*data)[0:3] {
+			if "MQS" != req.Data[0:3] {
 				break LOOP
 			}
-			var action = (*data)[3]
+			var action = req.Data[3]
+			done, resp := false, ""
 			switch action {
 			case '0':
-				done, resp := Login(&session)
+				done, resp = Login(&req)
 			case '1':
-				done, resp := Publish(&session)
+				done, resp = Publish(&req)
 			case '2':
-				done, resp := Retrieve(&session)
+				done, resp = Retrieve(&req)
 			case '3':
-				done, resp := LastPublish(&session)
+				done, resp = LastPublish(&req)
 			case '4':
-				done, resp := WatchStart(&session)
+				done, resp = WatchStart(&req)
 			case '8':
-				if strings.Index((*conn).RemoteAddr().String(), "127.0.0.1:") != 0 {
+				if strings.Index(conn.RemoteAddr().String(), "127.0.0.1:") != 0 {
 					break LOOP
 				}
-				done, resp := MasterUser(&session)
+				done, resp = MasterUser(&req)
 			case '9':
-				if strings.Index((*conn).RemoteAddr().String(), "127.0.0.1:") != 0 {
+				if strings.Index(conn.RemoteAddr().String(), "127.0.0.1:") != 0 {
 					break LOOP
 				}
-				done, resp := MasterAcls(&session)
-			default:
-				done, resp = false, ""
+				done, resp = MasterAcls(&req)
 			}
-			send(conn, resp)
+			if !done {
+				break LOOP
+			} else if resp != "" {
+				_, _ = conn.Write([]byte(resp))
+			}
 		}
 	}
-	if session.Subscribe != "" {
-		WatchKill(&session)
-	}
-	if lwTopic != "" {
-		SetTopic(&lwTopic, &lwSlot, &lwPayload)
-	}
-	log.Printf("Client from %s disconnected", conn.RemoteAddr())
 }
 
 func main() {
 	v.TCP()
-	listen(2443)
+	certPem, err := ioutil.ReadFile("cert/cert.pem")
+	if Error(err) {
+		os.Exit(1)
+	}
+	keyPem, err := ioutil.ReadFile("cert/key.pem")
+	if Error(err) {
+		os.Exit(1)
+	}
+	cert, err := tls.X509KeyPair(certPem, keyPem)
+	if Error(err) {
+		os.Exit(1)
+	}
+	port := "2443"
+	if len(os.Args) > 1 {
+		port = os.Args[1]
+	}
+	cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
+	listen, err := tls.Listen("tcp4", ":"+port, cfg)
+	if Error(err) {
+		os.Exit(1)
+	}
+	log.Printf("Listening on %s", listen.Addr())
+	defer func() {
+		log.Println("Error while creating new handler! Recovering...")
+		err := recover()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+	for {
+		conn, err := listen.Accept()
+		if Error(err) {
+			continue
+		}
+		go handler(conn)
+		time.Sleep(time.Millisecond * 50)
+	}
 }

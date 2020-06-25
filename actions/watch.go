@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"time"
 )
 
 var (
@@ -40,15 +41,15 @@ func WatchStart(req *SessionData) (bool, string) {
 }
 
 // WatchKill - Remove current watch
-func WatchKill(s *SessionData) {
+func WatchKill(req *SessionData) {
 	lconns.RLock()
 	defer lconns.RUnlock()
-	routines := conns[s.Subscribe]
-	for i, n := range conns[s.Subscribe] {
-		if n == s.Conn {
+	routines := conns[req.Subscribe]
+	for i, n := range conns[req.Subscribe] {
+		if n == req.Conn {
 			routines[i] = routines[len(routines)-1]
 			routines = routines[:len(routines)-1]
-			conns[s.Subscribe] = routines
+			conns[req.Subscribe] = routines
 			return
 		}
 	}
@@ -61,6 +62,7 @@ func WatchSend(topic *string, slot *int, payload *string) {
 	defer lconns.RUnlock()
 	routines := conns[*topic]
 	for _, n := range routines {
+		(*n).SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
 		(*n).Write([]byte(msg))
 	}
 }
