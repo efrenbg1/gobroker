@@ -5,7 +5,7 @@
     "tasks": [
         {
             "label": "Run",
-            "command": "build.bat",
+            "command": "gobroker.exe",
             "args": [],
             "type": "shell",
             "options": {
@@ -18,7 +18,10 @@
             "group": {
                 "kind": "build",
                 "isDefault": true
-            }
+            },
+            "dependsOn": [
+                "Build"
+            ]
         },
         {
             "label": "Build",
