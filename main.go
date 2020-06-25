@@ -5,23 +5,15 @@ import (
 	"crypto/tls"
 	. "gobroker/actions"
 	. "gobroker/db"
+	. "gobroker/tools"
 	v "gobroker/windows"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 )
-
-func check(e error) {
-	if e != nil {
-		log.Println(e)
-		os.Exit(1)
-	}
-}
 
 func listen(port int) {
 	defer func() {
@@ -30,7 +22,9 @@ func listen(port int) {
 		}
 	}()
 	certPem, err := ioutil.ReadFile("cert/cert.pem")
-	check(err)
+	if Error(err) {
+		return 1
+	}
 	keyPem, err := ioutil.ReadFile("cert/key.pem")
 	check(err)
 	cert, err := tls.X509KeyPair(certPem, keyPem)
@@ -62,17 +56,20 @@ func listen(port int) {
 	}
 }
 
+func send(conn *net.Conn, resp string) {
+	if resp == "" {
+		return
+	}
+	_, _ = (*conn).Write([]byte(resp))
+}
+
 func handler(conn net.Conn) {
 	defer conn.Close()
 	var (
-		buf       = make([]byte, 210)
-		r         = bufio.NewReader(conn)
-		w         = bufio.NewWriter(conn)
-		lwTopic   = ""
-		lwSlot    = 0
-		lwPayload = ""
-		username  = ""
-		subscribe = ""
+		buf     = make([]byte, 210)
+		r       = bufio.NewReader(conn)
+		w       = bufio.NewWriter(conn)
+		session = SessionData{&conn, "", "", 0, "", "", ""}
 	)
 	conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
 LOOP:
@@ -80,25 +77,47 @@ LOOP:
 		n, err := r.Read(buf)
 		data := string(buf[:n])
 		w.Flush()
-		switch err {
-		case io.EOF:
-			break LOOP
-		case nil:
-			if strings.HasSuffix(data, "\n") {
-				conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
-				if len(data) > 310 {
-					break LOOP
-				}
-				if handle(&data, &conn, &lwTopic, &lwSlot, &lwPayload, &username, &subscribe) == false {
-					break LOOP
-				}
-			}
-		default:
+		if Error(err) {
 			break LOOP
 		}
+		if strings.HasSuffix(data, "\n") {
+			conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
+			if len(data) > 310 {
+				break LOOP
+			}
+			if "MQS" == (*data)[0:3] {
+				break LOOP
+			}
+			var action = (*data)[3]
+			switch action {
+			case '0':
+				done, resp := Login(&session)
+			case '1':
+				done, resp := Publish(&session)
+			case '2':
+				done, resp := Retrieve(&session)
+			case '3':
+				done, resp := LastPublish(&session)
+			case '4':
+				done, resp := WatchStart(&session)
+			case '8':
+				if strings.Index((*conn).RemoteAddr().String(), "127.0.0.1:") != 0 {
+					break LOOP
+				}
+				done, resp := MasterUser(&session)
+			case '9':
+				if strings.Index((*conn).RemoteAddr().String(), "127.0.0.1:") != 0 {
+					break LOOP
+				}
+				done, resp := MasterAcls(&session)
+			default:
+				done, resp = false, ""
+			}
+			send(conn, resp)
+		}
 	}
-	if subscribe != "" {
-		WatchKill(&conn, &subscribe)
+	if session.Subscribe != "" {
+		WatchKill(&session)
 	}
 	if lwTopic != "" {
 		SetTopic(&lwTopic, &lwSlot, &lwPayload)

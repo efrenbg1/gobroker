@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"sync"
 
@@ -13,6 +14,17 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 )
+
+// SessionData contains all the data associated with the session of a client
+type SessionData struct {
+	Conn      *net.Conn
+	Data      string
+	LwTopic   string
+	LwSlot    int
+	LwPayload string
+	Username  string
+	Subscribe string
+}
 
 var (
 	users   = make(map[string]string)
