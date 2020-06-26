@@ -31,7 +31,12 @@ func WatchStart(req *SessionData) (bool, string) {
 			defer lconns.RUnlock()
 			req.Subscribe = topic
 			routines := conns[topic]
-			routines = append(routines, req.Conn)
+			if len(routines) > 4 {
+				routines = routines[1:]
+				routines = append(routines, req.Conn)
+			} else {
+				routines = append(routines, req.Conn)
+			}
 			conns[topic] = routines
 			return true, "MQS4"
 		}

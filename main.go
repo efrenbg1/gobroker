@@ -65,6 +65,16 @@ LOOP:
 				done, resp = LastPublish(&req)
 			case '4':
 				done, resp = WatchStart(&req)
+			case '6':
+				if strings.Index(conn.RemoteAddr().String(), "127.0.0.1:") != 0 {
+					break LOOP
+				}
+				done, resp = MasterPublish(&req)
+			case '7':
+				if strings.Index(conn.RemoteAddr().String(), "127.0.0.1:") != 0 {
+					break LOOP
+				}
+				done, resp = MasterRetrieve(&req)
 			case '8':
 				if strings.Index(conn.RemoteAddr().String(), "127.0.0.1:") != 0 {
 					break LOOP
