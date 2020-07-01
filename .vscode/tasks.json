@@ -5,7 +5,7 @@
     "tasks": [
         {
             "label": "Run",
-            "command": "gobroker.exe",
+            "command": "./gobroker",
             "args": [],
             "type": "shell",
             "options": {

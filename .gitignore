@@ -1,3 +1,5 @@
 
 *.exe
+gobroker
 tests
+*.db
