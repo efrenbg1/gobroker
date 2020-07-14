@@ -3,3 +3,4 @@
 gobroker
 tests
 *.db
+settings.json

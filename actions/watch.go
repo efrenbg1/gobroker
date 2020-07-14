@@ -61,12 +61,15 @@ func WatchKill(req *SessionData) {
 }
 
 // WatchSend - Send updated message to all the watch
-func WatchSend(topic *string, slot *int, payload *string) {
-	msg := "MQS5" + Len(topic) + *topic + strconv.Itoa(*slot) + Len(payload) + *payload + "\n"
+func WatchSend(req *SessionData, topic *string, slot *int, payload *string) {
+	msg := "MQS5" + strconv.Itoa(*slot) + Len(payload) + *payload + "\n"
 	lconns.RLock()
 	defer lconns.RUnlock()
 	routines := conns[*topic]
 	for _, n := range routines {
+		if req.Conn == n {
+			continue
+		}
 		(*n).SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
 		(*n).Write([]byte(msg))
 	}

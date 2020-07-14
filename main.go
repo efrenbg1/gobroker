@@ -66,22 +66,22 @@ LOOP:
 			case '4':
 				done, resp = WatchStart(&req)
 			case '6':
-				if strings.Index(conn.RemoteAddr().String(), "127.0.0.1:") != 0 {
+				if strings.Index(conn.RemoteAddr().String(), Conf.Master+":") != 0 {
 					break LOOP
 				}
 				done, resp = MasterPublish(&req)
 			case '7':
-				if strings.Index(conn.RemoteAddr().String(), "127.0.0.1:") != 0 {
+				if strings.Index(conn.RemoteAddr().String(), Conf.Master+":") != 0 {
 					break LOOP
 				}
 				done, resp = MasterRetrieve(&req)
 			case '8':
-				if strings.Index(conn.RemoteAddr().String(), "127.0.0.1:") != 0 {
+				if strings.Index(conn.RemoteAddr().String(), Conf.Master+":") != 0 {
 					break LOOP
 				}
 				done, resp = MasterUser(&req)
 			case '9':
-				if strings.Index(conn.RemoteAddr().String(), "127.0.0.1:") != 0 {
+				if strings.Index(conn.RemoteAddr().String(), Conf.Master+":") != 0 {
 					break LOOP
 				}
 				done, resp = MasterAcls(&req)
@@ -109,12 +109,8 @@ func main() {
 	if Error(err) {
 		os.Exit(1)
 	}
-	port := "2443"
-	if len(os.Args) > 1 {
-		port = os.Args[1]
-	}
 	cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
-	listen, err := tls.Listen("tcp4", ":"+port, cfg)
+	listen, err := tls.Listen("tcp4", Conf.Host, cfg)
 	if Error(err) {
 		os.Exit(1)
 	}

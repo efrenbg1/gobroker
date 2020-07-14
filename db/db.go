@@ -26,7 +26,21 @@ type SessionData struct {
 	Subscribe string
 }
 
+type SettingsDB struct {
+	Host     string `json:"host"`
+	User     string `json:"user"`
+	Password string `json:"pw"`
+	Database string `json:"db"`
+}
+
+type Settings struct {
+	Host   string     `json:"host"`
+	Master string     `json:"master"`
+	Mysql  SettingsDB `json:"mysql"`
+}
+
 var (
+	Conf    Settings
 	users   = make(map[string]string)
 	lusers  sync.RWMutex
 	acls    = make(map[string][]string)
@@ -97,18 +111,11 @@ func dbStart() *sql.DB {
 		os.Exit(1)
 	}
 	defer configFile.Close()
-	type Settings struct {
-		Host     string `json:"host"`
-		User     string `json:"user"`
-		Password string `json:"password"`
-		Database string `json:"database"`
-	}
 	bytes, _ := ioutil.ReadAll(configFile)
-	var settings Settings
-	json.Unmarshal(bytes, &settings)
+	json.Unmarshal(bytes, &Conf)
 	log.Println("Config loaded")
 	log.Println("Connecting to MySQL server...")
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", settings.User, settings.Password, settings.Host, settings.Database))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", Conf.Mysql.User, Conf.Mysql.Password, Conf.Mysql.Host, Conf.Mysql.Database))
 	if err != nil {
 		log.Println(err)
 		log.Println("Error connecting to mysql server")

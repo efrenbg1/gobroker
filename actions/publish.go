@@ -26,7 +26,7 @@ func Publish(req *SessionData) (bool, string) {
 			payloadEnd = topicEnd + payloadEnd + 3
 			payload := req.Data[topicEnd+3 : payloadEnd]
 			SetTopic(&topic, &slot, &payload)
-			WatchSend(&topic, &slot, &payload)
+			WatchSend(req, &topic, &slot, &payload)
 			return true, ""
 		}
 	}
