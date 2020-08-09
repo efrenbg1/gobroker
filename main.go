@@ -1,133 +1,58 @@
 package main
 
 import (
-	"bufio"
 	"crypto/tls"
-	. "gobroker/actions"
-	. "gobroker/db"
-	v "gobroker/linux"
-	. "gobroker/tools"
-	"io/ioutil"
+	"gobroker/actions"
+	"gobroker/db"
 	"log"
-	"net"
 	"os"
-	"strings"
-	"time"
+	"syscall"
 )
 
-func handler(conn net.Conn) {
-	defer func() {
-		recover()
-		log.Printf("Client from %s disconnected", conn.RemoteAddr())
-	}()
-	defer conn.Close()
-	var (
-		buf = make([]byte, 210)
-		r   = bufio.NewReader(conn)
-		w   = bufio.NewWriter(conn)
-		req = SessionData{&conn, "", "", 0, "", "", ""}
-	)
-	defer func() {
-		if req.Subscribe != "" {
-			WatchKill(&req)
-		}
-		if req.LwTopic != "" {
-			SetTopic(&req.LwTopic, &req.LwSlot, &req.LwPayload)
-		}
-	}()
-	conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
-LOOP:
-	for {
-		n, err := r.Read(buf)
-		req.Data = string(buf[:n])
-		w.Flush()
-		if err != nil {
-			break LOOP
-		}
-		if strings.HasSuffix(req.Data, "\n") {
-			conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
-			if len(req.Data) > 310 {
-				break LOOP
-			}
-			if "MQS" != req.Data[0:3] {
-				break LOOP
-			}
-			var action = req.Data[3]
-			done, resp := false, ""
-			switch action {
-			case '0':
-				done, resp = Login(&req)
-			case '1':
-				done, resp = Publish(&req)
-			case '2':
-				done, resp = Retrieve(&req)
-			case '3':
-				done, resp = LastPublish(&req)
-			case '4':
-				done, resp = WatchStart(&req)
-			case '6':
-				if strings.Index(conn.RemoteAddr().String(), Conf.Master+":") != 0 {
-					break LOOP
-				}
-				done, resp = MasterPublish(&req)
-			case '7':
-				if strings.Index(conn.RemoteAddr().String(), Conf.Master+":") != 0 {
-					break LOOP
-				}
-				done, resp = MasterRetrieve(&req)
-			case '8':
-				if strings.Index(conn.RemoteAddr().String(), Conf.Master+":") != 0 {
-					break LOOP
-				}
-				done, resp = MasterUser(&req)
-			case '9':
-				if strings.Index(conn.RemoteAddr().String(), Conf.Master+":") != 0 {
-					break LOOP
-				}
-				done, resp = MasterAcls(&req)
-			}
-			if !done {
-				break LOOP
-			} else if resp != "" {
-				_, _ = conn.Write([]byte(resp))
-			}
-		}
+func setRLimit() {
+	var rLimit syscall.Rlimit
+	or := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+	if err(or) {
+		os.Exit(3)
 	}
+	rLimit.Max = 20000
+	rLimit.Cur = 20000
+	or = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+	if err(or) {
+		os.Exit(3)
+	}
+	or = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+	if err(or) {
+		os.Exit(3)
+	}
+	log.Println("TCP limit set to:", rLimit.Max)
+}
+
+func err(e error) bool {
+	if e != nil {
+		log.Print(e)
+		return true
+	}
+	return false
 }
 
 func main() {
-	v.TCP()
-	certPem, err := ioutil.ReadFile("cert/cert.pem")
-	if Error(err) {
-		os.Exit(1)
-	}
-	keyPem, err := ioutil.ReadFile("cert/key.pem")
-	if Error(err) {
-		os.Exit(1)
-	}
-	cert, err := tls.X509KeyPair(certPem, keyPem)
-	if Error(err) {
+	setRLimit()
+	cert, or := tls.LoadX509KeyPair("cert/cert.pem", "cert/key.pem")
+	if err(or) {
 		os.Exit(1)
 	}
 	cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
-	listen, err := tls.Listen("tcp4", Conf.Host, cfg)
-	if Error(err) {
+	listen, or := tls.Listen("tcp4", db.Conf.Host, cfg)
+	if err(or) {
 		os.Exit(1)
 	}
 	log.Printf("Listening on %s", listen.Addr())
-	defer func() {
-		log.Println("Error while creating new handler! Recovering...")
-		err := recover()
-		if err != nil {
-			log.Println(err)
-		}
-	}()
 	for {
-		conn, err := listen.Accept()
-		if Error(err) {
+		conn, or := listen.Accept()
+		if err(or) {
 			continue
 		}
-		go handler(conn)
-		time.Sleep(time.Millisecond * 50)
+		go actions.Handle(conn)
 	}
 }

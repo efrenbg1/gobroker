@@ -1,29 +1,28 @@
 package actions
 
 import (
-	. "gobroker/db"
-	. "gobroker/tools"
+	"gobroker/db"
 	"strconv"
 )
 
-func Retrieve(req *SessionData) (bool, string) {
-	if req.Username != "" {
-		topicEnd, err := strconv.Atoi(req.Data[4:6])
-		if Error(err) {
+func retrieve(req *sessionData) (bool, string) {
+	if req.username != "" {
+		topicEnd, or := strconv.Atoi(req.data[4:6])
+		if err(or) {
 			return false, ""
 		}
 		topicEnd = topicEnd + 6
-		var topic = req.Data[6:topicEnd]
-		slot, err := strconv.Atoi(req.Data[topicEnd : topicEnd+1])
-		if Error(err) || slot > 9 || slot < 0 {
+		var topic = req.data[6:topicEnd]
+		slot, or := strconv.Atoi(req.data[topicEnd : topicEnd+1])
+		if err(or) || slot > 9 || slot < 0 {
 			return false, ""
 		}
-		if InAcls(&req.Username, &topic) {
-			payload := GetTopic(&topic, &slot)
+		if db.InAcls(&req.username, &topic) {
+			payload := db.GetTopic(&topic, &slot)
 			if payload == "" {
 				return true, "MQS7\n"
 			}
-			return true, string("MQS2" + Len(&payload) + payload + "\n")
+			return true, string("MQS2" + len2(&payload) + payload + "\n")
 		}
 		return false, "MQS8\n"
 	}

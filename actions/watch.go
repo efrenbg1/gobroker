@@ -1,8 +1,7 @@
 package actions
 
 import (
-	. "gobroker/db"
-	. "gobroker/tools"
+	"gobroker/db"
 	"net"
 	"strconv"
 	"sync"
@@ -14,28 +13,28 @@ var (
 	lconns sync.RWMutex
 )
 
-// WatchStart - Add topic to watch
-func WatchStart(req *SessionData) (bool, string) {
-	if req.Username != "" {
-		topicEnd, err := strconv.Atoi(req.Data[4:6])
-		if Error(err) {
+// watchStart - Add topic to watch
+func watchStart(req *sessionData) (bool, string) {
+	if req.username != "" {
+		topicEnd, or := strconv.Atoi(req.data[4:6])
+		if err(or) {
 			return false, ""
 		}
 		topicEnd = topicEnd + 6
-		var topic = req.Data[6:topicEnd]
-		if InAcls(&req.Username, &topic) {
-			if req.Subscribe != "" {
-				WatchKill(req)
+		var topic = req.data[6:topicEnd]
+		if db.InAcls(&req.username, &topic) {
+			if req.subscribe != "" {
+				watchKill(req)
 			}
 			lconns.RLock()
 			defer lconns.RUnlock()
-			req.Subscribe = topic
+			req.subscribe = topic
 			routines := conns[topic]
 			if len(routines) > 4 {
 				routines = routines[1:]
-				routines = append(routines, req.Conn)
+				routines = append(routines, req.conn)
 			} else {
-				routines = append(routines, req.Conn)
+				routines = append(routines, req.conn)
 			}
 			conns[topic] = routines
 			return true, "MQS4"
@@ -45,29 +44,29 @@ func WatchStart(req *SessionData) (bool, string) {
 	return false, ""
 }
 
-// WatchKill - Remove current watch
-func WatchKill(req *SessionData) {
+// watchKill - Remove current watch
+func watchKill(req *sessionData) {
 	lconns.RLock()
 	defer lconns.RUnlock()
-	routines := conns[req.Subscribe]
-	for i, n := range conns[req.Subscribe] {
-		if n == req.Conn {
+	routines := conns[req.subscribe]
+	for i, n := range conns[req.subscribe] {
+		if n == req.conn {
 			routines[i] = routines[len(routines)-1]
 			routines = routines[:len(routines)-1]
-			conns[req.Subscribe] = routines
+			conns[req.subscribe] = routines
 			return
 		}
 	}
 }
 
-// WatchSend - Send updated message to all the watch
-func WatchSend(req *SessionData, topic *string, slot *int, payload *string) {
-	msg := "MQS5" + strconv.Itoa(*slot) + Len(payload) + *payload + "\n"
+// watchSend - Send updated message to all the watch
+func watchSend(req *sessionData, topic *string, slot *int, payload *string) {
+	msg := "MQS5" + strconv.Itoa(*slot) + len2(payload) + *payload + "\n"
 	lconns.RLock()
 	defer lconns.RUnlock()
 	routines := conns[*topic]
 	for _, n := range routines {
-		if req.Conn == n {
+		if req.conn == n {
 			continue
 		}
 		(*n).SetDeadline(time.Now().Add(time.Duration(10) * time.Second))

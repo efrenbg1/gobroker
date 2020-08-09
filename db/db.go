@@ -6,26 +6,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
 	"os"
 	"sync"
 
-	. "gobroker/tools"
-
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql" // Import all functions from mysql package
 )
 
-// SessionData contains all the data associated with the session of a client
-type SessionData struct {
-	Conn      *net.Conn
-	Data      string
-	LwTopic   string
-	LwSlot    int
-	LwPayload string
-	Username  string
-	Subscribe string
-}
-
+// SettingsDB - Contains the DB settings placed inside settings.json
 type SettingsDB struct {
 	Host     string `json:"host"`
 	User     string `json:"user"`
@@ -33,6 +20,7 @@ type SettingsDB struct {
 	Database string `json:"db"`
 }
 
+// Settings - Contains the general settings placed inside settings.json
 type Settings struct {
 	Host   string     `json:"host"`
 	Master string     `json:"master"`
@@ -40,7 +28,7 @@ type Settings struct {
 }
 
 var (
-	Conf    Settings
+	Conf    Settings // Make global settings accesible to other packages
 	users   = make(map[string]string)
 	lusers  sync.RWMutex
 	acls    = make(map[string][]string)
@@ -49,6 +37,25 @@ var (
 	ltopics sync.RWMutex
 	db      = dbStart()
 )
+
+// SinA checks if string is in array
+func SinA(a *string, list *[]string) bool {
+	for _, b := range *list {
+		if b == *a {
+			return true
+		}
+	}
+	return false
+}
+
+// err - Function to handle errors and print them while debugging
+func err(e error) bool {
+	if e != nil {
+		log.Print(e)
+		return true
+	}
+	return false
+}
 
 func getUser(key *string) string {
 	lusers.RLock()
@@ -105,8 +112,8 @@ func SetTopic(key *string, slot *int, value *string) {
 }
 
 func dbStart() *sql.DB {
-	configFile, err := os.Open("settings.json")
-	if err != nil {
+	configFile, or := os.Open("settings.json")
+	if err(or) {
 		log.Println("Error while openning config file. Are permissions right?")
 		os.Exit(1)
 	}
@@ -115,14 +122,14 @@ func dbStart() *sql.DB {
 	json.Unmarshal(bytes, &Conf)
 	log.Println("Config loaded")
 	log.Println("Connecting to MySQL server...")
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", Conf.Mysql.User, Conf.Mysql.Password, Conf.Mysql.Host, Conf.Mysql.Database))
-	if err != nil {
-		log.Println(err)
+	db, or := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", Conf.Mysql.User, Conf.Mysql.Password, Conf.Mysql.Host, Conf.Mysql.Database))
+	if err(or) {
+		log.Println(or)
 		log.Println("Error connecting to mysql server")
 	}
-	err = db.Ping()
-	if err != nil {
-		log.Println(err)
+	or = db.Ping()
+	if err(or) {
+		log.Println(or)
 		log.Println("Error pinging mysql server")
 	}
 	return db
@@ -134,8 +141,8 @@ func GetPw(user *string) string {
 	if pw != "" {
 		return pw
 	}
-	err := db.QueryRow("SELECT pw FROM user WHERE username=? LIMIT 1", *user).Scan(&pw)
-	if err != nil {
+	or := db.QueryRow("SELECT pw FROM user WHERE username=? LIMIT 1", *user).Scan(&pw)
+	if err(or) {
 		return ""
 	}
 	setUser(user, &pw)
@@ -149,14 +156,14 @@ func InAcls(user *string, topic *string) bool {
 		return true
 	}
 	macs = nil
-	q, err := db.Query("SELECT a.mac FROM acls AS a LEFT JOIN share AS s ON a.mac=s.mac WHERE a.user=(SELECT id FROM user WHERE username=?) OR s.user=(SELECT id FROM user WHERE username=?)", *user, *user)
-	if err != nil {
+	q, or := db.Query("SELECT a.mac FROM acls AS a LEFT JOIN share AS s ON a.mac=s.mac WHERE a.user=(SELECT id FROM user WHERE username=?) OR s.user=(SELECT id FROM user WHERE username=?)", *user, *user)
+	if err(or) {
 		return false
 	}
 	var mac string
 	for q.Next() {
-		err = q.Scan(&mac)
-		if err != nil {
+		or = q.Scan(&mac)
+		if err(or) {
 			return false
 		}
 		macs = append(macs, mac)
