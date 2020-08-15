@@ -19,6 +19,7 @@ type sessionData struct {
 	lwPayload string
 	username  string
 	subscribe string
+	timeout   int
 }
 
 // len2 - Returns the length of a string with a padding of 2 characters
@@ -42,33 +43,37 @@ func err(e error) bool {
 // Handle - main loop function to handle a single connection
 func Handle(conn net.Conn) {
 	var (
-		buf = make([]byte, 210)
-		r   = bufio.NewReader(conn)
-		req = sessionData{&conn, "", "", 0, "", "", ""}
+		buf = make([]byte, 310)
+		r   = bufio.NewReaderSize(conn, 310)
+		req = sessionData{&conn, "", "", 0, "", "", "", 10}
 	)
 
 	defer func() {
+		recover()
+		log.Printf("Client from %s disconnected", conn.RemoteAddr())
+	}()
+	defer func() {
+		conn.Close()
 		if req.subscribe != "" {
 			watchKill(&req)
 		}
 		if req.lwTopic != "" {
 			db.SetTopic(&req.lwTopic, &req.lwSlot, &req.lwPayload)
+			watchSend(&req, &req.lwTopic, &req.lwSlot, &req.lwPayload)
 		}
-		conn.Close()
-		log.Printf("Client from %s disconnected", conn.RemoteAddr())
 	}()
 
-	conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
+	conn.SetDeadline(time.Now().Add(time.Duration(req.timeout) * time.Second))
 
 	for {
 		len, or := r.Read(buf)
-		if err(or) || len > 310 {
+		if or != nil || len > 310 {
 			return
 		}
 		req.data = string(buf[:len])
 
 		if strings.HasSuffix(req.data, "\n") {
-			conn.SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
+			conn.SetDeadline(time.Now().Add(time.Duration(req.timeout) * time.Second))
 
 			if "MQS" != req.data[0:3] {
 				return

@@ -69,7 +69,7 @@ func watchSend(req *sessionData, topic *string, slot *int, payload *string) {
 		if req.conn == n {
 			continue
 		}
-		(*n).SetDeadline(time.Now().Add(time.Duration(10) * time.Second))
+		(*n).SetDeadline(time.Now().Add(time.Duration(req.timeout) * time.Second))
 		(*n).Write([]byte(msg))
 	}
 }

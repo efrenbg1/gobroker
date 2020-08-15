@@ -38,6 +38,7 @@ func login(req *sessionData) (bool, string) {
 		sum := hash.Sum(nil)
 		if get[:64] == hex.EncodeToString(sum) {
 			req.username = user
+			req.timeout = 100
 			log.Println("New connection from " + (*(req.conn)).RemoteAddr().String() + " of " + user)
 			return true, "MQS0\n"
 		}
