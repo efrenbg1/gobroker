@@ -1,11 +1,12 @@
 [Unit]
 Description=MQTLS Broker
-ConditionPathExists=/root/gobroker
-After=xdk-daemon.service
+ConditionPathExists=/etc/gobroker
+Wants=network-online.target
+After=network-online.target
 
 [Service]
-WorkingDirectory=/root/gobroker
-ExecStart=/root/gobroker/gobroker
+WorkingDirectory=/etc/gobroker
+ExecStart=/usr/local/bin/gobroker
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=10
