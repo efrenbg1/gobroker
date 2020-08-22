@@ -10,6 +10,7 @@ go build
 if [ -f "gobroker" ]; then
     echo "\e[34mInstalling dependencies...\e[0m"
     cp gobroker /usr/local/bin/gobroker
+    cp /etc/gobroker/settings.json /etc/gobroker/settings.json.old 2>/dev/null || :
     mkdir -p /etc/gobroker
     cp settings-example.json /etc/gobroker/settings.json
     cp -r cert /etc/gobroker/
