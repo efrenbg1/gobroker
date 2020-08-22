@@ -119,7 +119,11 @@ func dbStart() *sql.DB {
 	}
 	defer configFile.Close()
 	bytes, _ := ioutil.ReadAll(configFile)
-	json.Unmarshal(bytes, &Conf)
+	or = json.Unmarshal(bytes, &Conf)
+	if err(or) {
+		log.Println("Error loading config file!")
+		os.Exit(1)
+	}
 	log.Println("Config loaded")
 	log.Println("Connecting to MySQL server...")
 	db, or := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", Conf.Mysql.User, Conf.Mysql.Password, Conf.Mysql.Host, Conf.Mysql.Database))
