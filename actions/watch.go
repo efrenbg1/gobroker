@@ -37,7 +37,7 @@ func watchStart(req *sessionData) (bool, string) {
 				routines = append(routines, req.conn)
 			}
 			conns[topic] = routines
-			return true, "MQS4"
+			return true, "MQS4\n"
 		}
 		return false, "MQS8\n"
 	}
