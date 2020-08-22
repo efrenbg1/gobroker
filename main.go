@@ -50,7 +50,10 @@ func main() {
 	log.Printf("Listening on %s", listen.Addr())
 	for {
 		conn, or := listen.Accept()
-		if err(or) {
+		if or != nil {
+			if db.Conf.Debug {
+				log.Println(or)
+			}
 			continue
 		}
 		go actions.Handle(conn)

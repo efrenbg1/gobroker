@@ -34,7 +34,9 @@ func len2(str *string) string {
 // err - Function to handle errors and print them while debugging
 func err(e error) bool {
 	if e != nil {
-		log.Print(e)
+		if db.Conf.Debug {
+			log.Print(e)
+		}
 		return true
 	}
 	return false

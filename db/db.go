@@ -24,6 +24,7 @@ type SettingsDB struct {
 type Settings struct {
 	Host   string     `json:"host"`
 	Master string     `json:"master"`
+	Debug  bool       `json:"debug"`
 	Mysql  SettingsDB `json:"mysql"`
 }
 

@@ -1,6 +1,7 @@
 {
     "host": "0.0.0.0:2443  (ip + port the broker will listen)",
     "master": "127.0.0.1 (ip you expect the master will make requests from)",
+    "debug": false,
     "mysql": {
         "host": "127.0.0.1 (MySQL ip)",
         "user": "web (MySQL username)",
