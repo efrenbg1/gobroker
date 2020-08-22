@@ -1,4 +1,3 @@
-// This is an example for the config file which must be named "settings.json"
 {
     "host": "0.0.0.0:2443  (ip + port the broker will listen)",
     "master": "127.0.0.1 (ip you expect the master will make requests from)",
