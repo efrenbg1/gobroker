@@ -21,6 +21,7 @@ type sessionData struct {
 	username  string
 	subscribe string
 	timeout   int
+	qos       bool
 }
 
 // len2 - Returns the length of a string with a padding of 2 characters
@@ -48,7 +49,7 @@ func Handle(conn net.Conn) {
 	var (
 		buf = make([]byte, 310)
 		r   = bufio.NewReaderSize(conn, 310)
-		req = sessionData{&conn, "", "", 0, "", "", "", 10}
+		req = sessionData{&conn, "", "", 0, "", "", "", 10, false}
 	)
 
 	defer func() {
