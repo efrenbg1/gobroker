@@ -26,7 +26,7 @@ func masterPublish(req *sessionData) (bool, string) {
 	payload := req.data[topicEnd+3 : payloadEnd]
 	db.SetTopic(&topic, &slot, &payload)
 	watchSend(req, &topic, &slot, &payload)
-	return true, ""
+	return true, "MQS6\n"
 }
 
 // masterRetrieve allows anyone comming from 127.0.0.1 to read data from a topic

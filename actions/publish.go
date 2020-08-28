@@ -27,7 +27,7 @@ func publish(req *sessionData) (bool, string) {
 			payload := req.data[topicEnd+3 : payloadEnd]
 			db.SetTopic(&topic, &slot, &payload)
 			watchSend(req, &topic, &slot, &payload)
-			return true, ""
+			return true, "MQS1\n"
 		}
 	}
 	return false, ""
