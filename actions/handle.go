@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/efrenbg1/gobroker/db"
+	"gobroker/db"
 )
 
 // sessionData contains all the data associated with the session of a client

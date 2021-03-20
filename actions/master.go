@@ -3,7 +3,7 @@ package actions
 import (
 	"strconv"
 
-	"github.com/efrenbg1/gobroker/db"
+	"gobroker/db"
 )
 
 // masterPublish allows anyone comming from 127.0.0.1 to publish to a topic

@@ -6,8 +6,8 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/efrenbg1/gobroker/actions"
-	"github.com/efrenbg1/gobroker/db"
+	"gobroker/actions"
+	"gobroker/db"
 )
 
 func setRLimit() {
