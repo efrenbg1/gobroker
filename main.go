@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha1"
 	"crypto/tls"
+	"fmt"
 	"log"
 	"os"
 	"syscall"
@@ -38,11 +40,26 @@ func err(e error) bool {
 }
 
 func main() {
-	setRLimit()
 	cert, or := tls.LoadX509KeyPair("cert/cert.pem", "cert/key.pem")
 	if err(or) {
-		os.Exit(1)
+		createCertificate()
+		cert, or = tls.LoadX509KeyPair("cert/cert.pem", "cert/key.pem")
+		if err(or) {
+			os.Exit(1)
+		}
 	}
+	var fingerprint []byte
+	for _, s := range cert.Certificate {
+		fingerprint = append(fingerprint, s...)
+	}
+	sha := ""
+	for _, s := range sha1.Sum(fingerprint) {
+		if sha != "" {
+			sha += ":"
+		}
+		sha += fmt.Sprintf("%02X", s)
+	}
+	log.Println(sha)
 	cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
 	listen, or := tls.Listen("tcp4", db.Conf.Host, cfg)
 	if err(or) {
